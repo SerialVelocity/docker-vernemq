@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Check istio readiness
+istio_health() {
+  cmd=$(curl -s http://localhost:15021/healthz/ready > /dev/null)
+  status=$?
+  return $status
+}
+
 NET_INTERFACE=$(route | grep '^default' | grep -o '[^ ]*$')
 NET_INTERFACE=${DOCKER_NET_INTERFACE:-${NET_INTERFACE}}
 IP_ADDRESS=$(ip -4 addr show ${NET_INTERFACE} | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | sed -e "s/^[[:space:]]*//" | head -n 1)
@@ -44,6 +51,15 @@ fi
 insecure=""
 if env | grep "DOCKER_VERNEMQ_KUBERNETES_INSECURE" -q; then
     insecure="--insecure"
+fi
+
+if env | grep "DOCKER_VERNEMQ_KUBERNETES_ISTIO_ENABLED" -q; then
+    istio_health
+    while [ $status != 0 ]; do
+        istio_health
+        sleep 1
+    done
+    echo "Istio ready"
 fi
 
 if env | grep "DOCKER_VERNEMQ_DISCOVERY_KUBERNETES" -q; then
